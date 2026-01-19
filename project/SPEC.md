@@ -35,7 +35,7 @@ sections:
 
 ```
 ┌─────────────────────────────────────────────┐
-│ [●] Luis Emidio                       [EN]  │
+│ [●] Luis Emidio                             │
 │ Future-oriented Full Stack Developer        │
 ├─────────────────────────────────────────────┤
 │ [H]ome [A]bout [P]ortfolio [C]ontact        │

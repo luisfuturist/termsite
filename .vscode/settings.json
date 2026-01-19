@@ -1,4 +1,7 @@
 {
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+
   // Disable the default formatter, use eslint instead
   "prettier.enable": false,
   "editor.formatOnSave": false,
@@ -47,5 +50,17 @@
     "scss",
     "pcss",
     "postcss"
-  ]
+  ],
+
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/dist": true
+  },
+
+  "typescript.tsdk": "node_modules/typescript/lib",
+
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "package.json": "pnpm-lock.yaml, tsconfig.json, eslint.config.js, tsup.config.ts"
+  }
 }
