@@ -11,16 +11,18 @@ function Logo() {
 }
 
 function LogoContained() {
-  <Box
-    borderStyle="single"
-    justifyContent="center"
-    alignItems="center"
-    borderColor={theme.color.mutedBackground}
-    paddingY={0}
-    paddingX={1}
-  >
-    <Logo />
-  </Box>
+  return (
+    <Box
+      borderStyle="single"
+      justifyContent="center"
+      alignItems="center"
+      borderColor={theme.color.mutedBackground}
+      paddingY={0}
+      paddingX={1}
+    >
+      <Logo />
+    </Box>
+  )
 }
 
 export { Logo, LogoContained }
