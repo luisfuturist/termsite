@@ -1,42 +1,129 @@
+import type { ScrollViewRef } from 'ink-scroll-view'
 import process from 'node:process'
-import { Box, Text, useInput } from 'ink'
+import { Box, useInput, useStdout } from 'ink'
+import { ScrollView } from 'ink-scroll-view'
 import * as React from 'react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { CONTACTME } from './components/CONTACTME'
+import { CountdownToSingularity } from './components/CountdownToSingularity'
+import { Header } from './components/Header'
+import { Hero } from './components/Hero'
+import { Projects } from './components/Projects'
+import { README } from './components/README'
+import { ScreenTooSmall } from './components/ScreenTooSmall'
 
-type Section = 'home' | 'about' | 'portfolio' | 'contact'
+const MIN_WIDTH = 120
+const MIN_HEIGHT = 30
+
+// Approximate section positions (in lines)
+const SECTION_POSITIONS = {
+  hero: 0,
+  readme: 27, // Hero is ~12 lines
+  projects: 48, // Hero + README is ~30 lines
+  contactme: 171, // After Projects + CountdownToSingularity + ContactCta
+}
 
 const App: React.FC = () => {
-  const [section, _setSection] = useState<Section>('home')
+  const scrollRef = useRef<ScrollViewRef>(null)
+  const { stdout } = useStdout()
+  const [dimensions, setDimensions] = useState({
+    width: stdout?.columns || 0,
+    height: stdout?.rows || 0,
+  })
 
+  // 1. Handle Terminal Resizing due to manual window change
+  useEffect(() => {
+    const handleResize = () => {
+      setDimensions({
+        width: stdout?.columns || 0,
+        height: stdout?.rows || 0,
+      })
+      scrollRef.current?.remeasure()
+    }
+    stdout?.on('resize', handleResize)
+    return () => {
+      stdout?.off('resize', handleResize)
+    }
+  }, [stdout])
+
+  // 2. Handle Keyboard Input
+  useInput((_input, key) => {
+    if (key.upArrow) {
+      scrollRef.current?.scrollBy(-1) // Scroll up 1 line
+    }
+    if (key.downArrow) {
+      scrollRef.current?.scrollBy(1) // Scroll down 1 line
+    }
+    if (key.pageUp) {
+      // Scroll up by viewport height
+      const height = scrollRef.current?.getViewportHeight() || 1
+      scrollRef.current?.scrollBy(-height)
+    }
+    if (key.pageDown) {
+      const height = scrollRef.current?.getViewportHeight() || 1
+      scrollRef.current?.scrollBy(height)
+    }
+  })
+
+  // 3. Handle Navigation Keys
+  useInput((input) => {
+    if (input === 'h' || input === 'H') {
+      // Scroll to Hero (top)
+      scrollRef.current?.scrollTo(SECTION_POSITIONS.hero)
+    }
+    if (input === 'r' || input === 'R') {
+      // Scroll to README
+      scrollRef.current?.scrollTo(SECTION_POSITIONS.readme)
+    }
+    if (input === 'p' || input === 'P') {
+      // Scroll to Projects
+      scrollRef.current?.scrollTo(SECTION_POSITIONS.projects)
+    }
+    if (input === 'c' || input === 'C') {
+      // Scroll to CONTACTME
+      scrollRef.current?.scrollTo(SECTION_POSITIONS.contactme)
+    }
+  })
+
+  // 4. Handle Escape or 'q' to quit
   useInput((input, key) => {
     if (key.escape || input === 'q')
       process.exit()
   })
 
+  // Check if screen is too small
+  const isScreenTooSmall = dimensions.width < MIN_WIDTH || dimensions.height < MIN_HEIGHT
+
+  if (isScreenTooSmall) {
+    return (
+      <ScreenTooSmall
+        width={dimensions.width}
+        height={dimensions.height}
+        minWidth={MIN_WIDTH}
+        minHeight={MIN_HEIGHT}
+      />
+    )
+  }
+
   return (
-    <Box flexDirection="column" padding={1}>
-      <Box borderStyle="single" flexDirection="column" paddingX={1}>
-        {/* Header */}
-        <Box justifyContent="space-between">
-          <Text bold>[●] Luis Emidio</Text>
-        </Box>
-        <Text>Future-oriented Full Stack Developer</Text>
+    <Box
+      width="100%"
+      height="100%"
+      position="relative"
+    >
+      <Box flexDirection="column" paddingX={3} paddingTop={6}>
+        <ScrollView ref={scrollRef}>
+          <Hero />
+          <README />
+          <Projects />
+          <CountdownToSingularity />
+          {/* <ContactCta /> */}
+          <CONTACTME />
+        </ScrollView>
+      </Box>
 
-        {/* Navigation */}
-        <Box marginTop={1}>
-          <Text>
-            [H]ome [A]bout [P]ortfolio [C]ontact
-          </Text>
-        </Box>
-
-        {/* Content */}
-        <Box marginTop={1} flexDirection="column">
-          <Text color="green">
-            Current section:
-            {section}
-          </Text>
-          <Text dimColor>Press 'q' to quit (not implemented yet)</Text>
-        </Box>
+      <Box position="absolute" paddingX={3} width="100%">
+        <Header />
       </Box>
     </Box>
   )
