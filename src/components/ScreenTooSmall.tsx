@@ -45,7 +45,7 @@ interface ScreenTooSmallCardProps {
 
 function ScreenTooSmallCard({ width, height, minWidth, minHeight }: ScreenTooSmallCardProps) {
   return (
-    <Box flexDirection="column" alignItems="center" borderStyle="round" borderColor={theme.color.primary} paddingX={4} paddingY={2}>
+    <Box flexDirection="column" alignItems="center" borderStyle="single" borderColor={theme.color.primary} paddingX={4} paddingY={2}>
       <Text bold color={theme.color.destructive}>
         SCREEN TOO SMALL
       </Text>

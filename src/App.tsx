@@ -1,6 +1,5 @@
 import type { ScrollViewRef } from 'ink-scroll-view'
-import process from 'node:process'
-import { Box, useInput, useStdout } from 'ink'
+import { Box, useApp, useInput, useStdout } from 'ink'
 import { ScrollView } from 'ink-scroll-view'
 import * as React from 'react'
 import { useEffect, useRef, useState } from 'react'
@@ -26,6 +25,7 @@ const SECTION_POSITIONS = {
 const App: React.FC = () => {
   const scrollRef = useRef<ScrollViewRef>(null)
   const { stdout } = useStdout()
+  const { exit } = useApp()
   const [dimensions, setDimensions] = useState({
     width: stdout?.columns || 0,
     height: stdout?.rows || 0,
@@ -87,8 +87,13 @@ const App: React.FC = () => {
 
   // 4. Handle Escape or 'q' to quit
   useInput((input, key) => {
-    if (key.escape || input === 'q')
-      process.exit()
+    if (
+      key.escape
+      || input === 'q'
+      || (key.ctrl && input === 'c')
+    ) {
+      exit()
+    }
   })
 
   // Check if screen is too small
