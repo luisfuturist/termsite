@@ -140,8 +140,20 @@ new Server(
           stream.end()
         })
 
+        const wrapStream = (stream: InkStream) => {
+          const originalWrite = stream.write.bind(stream)
+          stream.write = (chunk: string | Buffer, encoding?: any, cb?: any) => {
+            if (typeof chunk === 'string') {
+              chunk = chunk.replace(/\n/g, '\r\n')
+            }
+            return originalWrite(chunk, encoding, cb)
+          }
+          return stream
+        }
+
         session.on('shell', (accept) => {
           stream = accept() as InkStream
+          stream = wrapStream(stream)
 
           if (!hasPty) {
             stream.write('Error: PTY required\r\n')
@@ -164,27 +176,38 @@ new Server(
 
           try {
             // Enter fullscreen mode with alternate screen buffer
+            // Switch to alternate buffer, move cursor to top-left, clear screen, hide cursor
             enterFullScreen()
 
-            app = withFullScreen(
-              <App />,
-              {
-                stdin: stream as unknown as NodeJS.ReadStream,
-                stdout: stream as unknown as NodeJS.WriteStream,
-                columns: stream.columns,
-                rows: stream.rows,
-                exitOnCtrlC: false,
-              },
-            )
-            app.start()
+            // Flush the stream to ensure cursor position is correct before Ink starts
+            stream.write('', () => {
+              try {
+                app = withFullScreen(
+                  <App />,
+                  {
+                    stdin: stream as unknown as NodeJS.ReadStream,
+                    stdout: stream as unknown as NodeJS.WriteStream,
+                    columns: stream.columns,
+                    rows: stream.rows,
+                    exitOnCtrlC: false,
+                  },
+                )
+                app.start()
 
-            // Ensure cleanup is always called, even on Promise rejection
-            app.waitUntilExit()
-              .then(() => cleanup())
-              .catch((error) => {
-                console.error('Ink runtime error:', error)
+                // Ensure cleanup is always called, even on Promise rejection
+                app.waitUntilExit()
+                  .then(() => cleanup())
+                  .catch((error) => {
+                    console.error('Ink runtime error:', error)
+                    cleanup(1)
+                  })
+              }
+              catch (error) {
+                console.error('Ink initialization error:', error)
+                exitFullScreen()
                 cleanup(1)
-              })
+              }
+            })
           }
           catch (error) {
             console.error('Ink initialization error:', error)

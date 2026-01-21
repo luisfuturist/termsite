@@ -9,7 +9,7 @@ export const CONTACTME: React.FC = () => {
   return (
     <Box flexDirection="column" padding={4} borderStyle="single" borderColor={theme.color.mutedBackground} marginTop={6}>
       <Box paddingX={2} marginBottom={2}>
-        <BigText text="Luis Emidio" font="3d" colors={[theme.color.primary]} />
+        <BigText text="Emidio" font="3d" colors={[theme.color.primary]} />
       </Box>
 
       <Box paddingX={2} gap={4} marginBottom={4}>

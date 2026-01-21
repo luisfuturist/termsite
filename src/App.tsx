@@ -10,6 +10,7 @@ import { Hero } from './components/Hero'
 import { Projects } from './components/Projects'
 import { README } from './components/README'
 import { ScreenTooSmall } from './components/ScreenTooSmall'
+import { theme } from './styles/theme'
 
 const MIN_WIDTH = 120
 const MIN_HEIGHT = 30
@@ -115,6 +116,7 @@ const App: React.FC = () => {
       width="100%"
       height="100%"
       position="relative"
+      // backgroundColor={theme.color.background}
     >
       <Box flexDirection="column" paddingX={3} paddingTop={6}>
         <ScrollView ref={scrollRef}>
