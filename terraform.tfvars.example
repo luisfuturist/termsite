@@ -1,0 +1,10 @@
+tenancy_ocid         = "ocid1.tenancy.oc1..xxxx"
+user_ocid            = "ocid1.user.oc1..xxxx"
+fingerprint          = "xx:xx:xx:xx"
+private_key_path     = "/home/user/.oci/oci_api_key.pem"
+region               = "us-ashburn-1"
+compartment_ocid     = "ocid1.compartment.oc1..xxxx"
+ad                   = "Uocm:PHX-AD-1"
+public_ssh_key_path  = "/home/user/.ssh/id_rsa.pub"
+ubuntu_image_id      = "ocid1.image.oc1..xxxx"  # get from OCI console
+private_ssh_key_path = "/home/user/.ssh/id_rsa"
