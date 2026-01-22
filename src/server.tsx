@@ -1,25 +1,20 @@
+import type { Buffer as BufferType } from 'node:buffer'
 import type { PseudoTtyInfo, ServerChannel, Server as ServerType, Session } from 'ssh2'
 import fs from 'node:fs'
+import path from 'node:path'
 import process from 'node:process'
-import { withFullScreen } from 'fullscreen-ink'
-import * as React from 'react'
+import { fileURLToPath } from 'node:url'
+import * as pty from 'node-pty'
 import ssh2 from 'ssh2'
-import App from './App'
 
 const { Server } = ssh2
 
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const INK_APP_PATH = path.join(__dirname, 'index.js')
+
 interface InkSshSession extends Session {
   ptyInfo?: PseudoTtyInfo
-}
-
-interface InkStream extends ServerChannel {
-  isTTY: boolean
-  isRaw: boolean
-  columns: number
-  rows: number
-  setRawMode: (mode: boolean) => void
-  ref: () => void
-  unref: () => void
 }
 
 new Server(
@@ -36,44 +31,23 @@ new Server(
       .on('session', (accept) => {
         const session = accept() as InkSshSession
 
-        let app: ReturnType<typeof withFullScreen> | null = null
-        let stream: InkStream
+        let stream: ServerChannel
+        let ptyProcess: pty.IPty | null = null
         let hasPty = false
         let cleanedUp = false
-
-        // Preserve original TERM for restoration after session
-        const originalTerm = process.env.TERM
 
         let resizeTimeout: NodeJS.Timeout | null = null
 
         const resize = () => {
-          if (!stream || !session.ptyInfo)
+          if (!ptyProcess || !session.ptyInfo)
             return
 
           if (resizeTimeout)
             clearTimeout(resizeTimeout)
 
           resizeTimeout = setTimeout(() => {
-            stream.columns = session.ptyInfo!.cols
-            stream.rows = session.ptyInfo!.rows
-            stream.emit('resize')
+            ptyProcess!.resize(session.ptyInfo!.cols, session.ptyInfo!.rows)
           }, 50) // 50ms debounce
-        }
-
-        const enterFullScreen = () => {
-          try {
-            // Enable alternate screen buffer, clear screen, hide cursor
-            stream?.write('\x1B[?1049h\x1B[H\x1B[2J\x1B[?25l')
-          }
-          catch {}
-        }
-
-        const exitFullScreen = () => {
-          try {
-            // Show cursor, disable alternate screen buffer
-            stream?.write('\x1B[?25h\x1B[?1049l')
-          }
-          catch {}
         }
 
         const cleanup = (code = 0) => {
@@ -82,8 +56,7 @@ new Server(
           cleanedUp = true
 
           try {
-            app?.instance.unmount()
-            exitFullScreen()
+            ptyProcess?.kill()
             stream?.exit(code)
             stream?.end()
 
@@ -92,14 +65,6 @@ new Server(
             session?.removeAllListeners()
             client?.removeAllListeners()
             resizeTimeout && clearTimeout(resizeTimeout)
-
-            // Restore original TERM environment variable
-            if (originalTerm !== undefined) {
-              process.env.TERM = originalTerm
-            }
-            else {
-              delete process.env.TERM
-            }
           }
           catch {}
         }
@@ -113,11 +78,6 @@ new Server(
           accept()
           hasPty = true
           session.ptyInfo = info
-          // Set TERM environment variable for Ink components and Node TTY utilities
-          const termType = (info as PseudoTtyInfo & { term?: string }).term
-          if (termType) {
-            process.env.TERM = termType
-          }
         })
 
         session.on('window-change', (accept, _reject, info) => {
@@ -140,20 +100,8 @@ new Server(
           stream.end()
         })
 
-        const wrapStream = (stream: InkStream) => {
-          const originalWrite = stream.write.bind(stream)
-          stream.write = (chunk: string | Buffer, encoding?: any, cb?: any) => {
-            if (typeof chunk === 'string') {
-              chunk = chunk.replace(/\n/g, '\r\n')
-            }
-            return originalWrite(chunk, encoding, cb)
-          }
-          return stream
-        }
-
         session.on('shell', (accept) => {
-          stream = accept() as InkStream
-          stream = wrapStream(stream)
+          stream = accept()
 
           if (!hasPty) {
             stream.write('Error: PTY required\r\n')
@@ -162,56 +110,48 @@ new Server(
             return
           }
 
-          stream.isTTY = true
-          stream.setRawMode = (_mode: boolean) => stream
-          stream.isRaw = true
-          stream.ref = () => stream
-          stream.unref = () => stream
-
-          // Set initial dimensions from ptyInfo
-          if (session.ptyInfo) {
-            stream.columns = session.ptyInfo.cols
-            stream.rows = session.ptyInfo.rows
+          if (!session.ptyInfo) {
+            stream.write('Error: PTY info not available\r\n')
+            stream.exit(1)
+            stream.end()
+            return
           }
 
           try {
-            // Enter fullscreen mode with alternate screen buffer
-            // Switch to alternate buffer, move cursor to top-left, clear screen, hide cursor
-            enterFullScreen()
+            // Spawn the Ink app as a child process inside a PTY
+            // This ensures fullscreen works, no line skipping, and proper cursor positioning
+            const termType = (session.ptyInfo as PseudoTtyInfo & { term?: string }).term || 'xterm-256color'
 
-            // Flush the stream to ensure cursor position is correct before Ink starts
-            stream.write('', () => {
-              try {
-                app = withFullScreen(
-                  <App />,
-                  {
-                    stdin: stream as unknown as NodeJS.ReadStream,
-                    stdout: stream as unknown as NodeJS.WriteStream,
-                    columns: stream.columns,
-                    rows: stream.rows,
-                    exitOnCtrlC: false,
-                  },
-                )
-                app.start()
+            ptyProcess = pty.spawn('node', [INK_APP_PATH], {
+              name: termType,
+              cols: session.ptyInfo.cols,
+              rows: session.ptyInfo.rows,
+              cwd: process.cwd(),
+              env: {
+                ...process.env,
+                TERM: termType,
+                FORCE_COLOR: '3',
+                COLORTERM: 'truecolor',
+              } as { [key: string]: string },
+            })
 
-                // Ensure cleanup is always called, even on Promise rejection
-                app.waitUntilExit()
-                  .then(() => cleanup())
-                  .catch((error) => {
-                    console.error('Ink runtime error:', error)
-                    cleanup(1)
-                  })
-              }
-              catch (error) {
-                console.error('Ink initialization error:', error)
-                exitFullScreen()
-                cleanup(1)
-              }
+            // Pipe data from PTY to SSH stream
+            ptyProcess.onData((data) => {
+              stream.write(data)
+            })
+
+            // Pipe data from SSH stream to PTY
+            stream.on('data', (data: BufferType) => {
+              ptyProcess?.write(data.toString())
+            })
+
+            // Handle PTY exit
+            ptyProcess.onExit(({ exitCode }) => {
+              cleanup(exitCode)
             })
           }
           catch (error) {
-            console.error('Ink initialization error:', error)
-            exitFullScreen()
+            console.error('PTY/Ink initialization error:', error)
             cleanup(1)
           }
         })
