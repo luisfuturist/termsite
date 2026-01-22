@@ -1,0 +1,29 @@
+name: Deploy
+
+on:
+  push:
+    branches: [deploy]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        run: echo ${{ secrets.GH_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build & Push
+        run: |
+          docker build -t ghcr.io/luisfuturist/termsite:latest .
+          docker push ghcr.io/luisfuturist/termsite:latest
+
+      - name: Deploy to Oracle VM
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ubuntu
+          key: ${{ secrets.OCI_SSH_KEY }}
+          script: |
+            docker pull ghcr.io/luisfuturist/termsite:latest
+            docker compose up -d
