@@ -10,10 +10,8 @@
   },
   "scripts": {
     "dev": "tsx watch app/index.tsx",
-    "dev:build": "tsup --watch",
     "build": "tsup",
-    "start": "node dist/app/index.js",
-    "start:server": "node dist/server/main.js",
+    "start": "node dist/server/main.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
