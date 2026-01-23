@@ -1,0 +1,49 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build output (will be rebuilt)
+dist
+
+# Environment files
+.env*
+!.env.example
+
+# Keys and secrets
+*.key
+*.pem
+host.key
+host.key.pub
+
+# Terraform
+terraform.tfvars*
+!terraform.tfvars.example
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Documentation
+README.md
+docs/
+project/
+
+# CI/CD
+.github/
+
+# Cloud
+cloud-init.yaml
+scripts/
+
+# Misc
+*.log
+.DS_Store

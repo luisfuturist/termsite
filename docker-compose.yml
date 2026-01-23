@@ -1,0 +1,20 @@
+services:
+  termsite:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: termsite
+    restart: unless-stopped
+    ports:
+      - "2222:2222"
+    volumes:
+      # Persist host key across container restarts
+      - ./host.key:/app/host.key
+    environment:
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "sh", "-c", "netstat -an | grep 2222 > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

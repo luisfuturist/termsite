@@ -5,19 +5,54 @@ package_upgrade: true
 packages:
   - git
   - curl
+  - ca-certificates
+  - gnupg
 
 runcmd:
-  # Install Node.js 20
-  - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-  - apt-get install -y nodejs
-  # Install pnpm
-  - curl -fsSL https://get.pnpm.io/install.sh | sh -
-  - export PNPM_HOME="/root/.local/share/pnpm"
-  - export PATH="$PNPM_HOME:$PATH"
-  # Clone and setup project
-  - git clone https://github.com/luisfuturist/termsite.git /opt/termsite
-  - cd /opt/termsite
-  - /root/.local/share/pnpm/pnpm install
-  - /root/.local/share/pnpm/pnpm build
-  # Start SSH server
-  - nohup /root/.local/share/pnpm/pnpm start:server > /var/log/termsite.log 2>&1 &
+  # Install Docker
+  - install -m 0755 -d /etc/apt/keyrings
+  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - chmod a+r /etc/apt/keyrings/docker.asc
+  - echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  - apt-get update
+  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+  # Add ubuntu user to docker group
+  - usermod -aG docker ubuntu
+
+  # Create deployment directory
+  - mkdir -p /opt/termsite
+  - chown ubuntu:ubuntu /opt/termsite
+
+  # Generate SSH host key for the termsite app
+  - su - ubuntu -c 'ssh-keygen -t ed25519 -f /opt/termsite/host.key -N "" -C "termsite-host-key"'
+
+  # Create docker-compose.yml
+  - |
+    cat > /opt/termsite/docker-compose.yml << 'EOF'
+    services:
+      termsite:
+        image: ghcr.io/luisfuturist/termsite:latest
+        container_name: termsite
+        restart: unless-stopped
+        ports:
+          - "2222:2222"
+        volumes:
+          - ./host.key:/app/host.key
+        environment:
+          - NODE_ENV=production
+        healthcheck:
+          test: ["CMD", "sh", "-c", "netstat -an | grep 2222 > /dev/null || exit 1"]
+          interval: 30s
+          timeout: 10s
+          retries: 3
+          start_period: 10s
+    EOF
+
+  # Set proper permissions
+  - chown ubuntu:ubuntu /opt/termsite/docker-compose.yml
+  - chmod 600 /opt/termsite/host.key
+
+  # Enable Docker service
+  - systemctl enable docker
+  - systemctl start docker
