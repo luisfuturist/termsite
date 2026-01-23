@@ -5,7 +5,7 @@
     "jsxFactory": "React.createElement",
     "jsxFragmentFactory": "React.Fragment",
     "lib": ["ES2022"],
-    "rootDir": "src",
+    "rootDir": ".",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
@@ -17,6 +17,6 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*"],
+  "include": ["app/**/*", "server/**/*"],
   "exclude": ["node_modules", "dist"]
 }

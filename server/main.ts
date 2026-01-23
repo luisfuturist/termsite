@@ -11,7 +11,7 @@ const { Server } = ssh2
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const INK_APP_PATH = path.join(__dirname, 'index.js')
+const INK_APP_PATH = path.join(__dirname, '..', 'app', 'index.js')
 
 interface InkSshSession extends Session {
   ptyInfo?: PseudoTtyInfo
@@ -122,13 +122,29 @@ new Server(
             // This ensures fullscreen works, no line skipping, and proper cursor positioning
             const termType = (session.ptyInfo as PseudoTtyInfo & { term?: string }).term || 'xterm-256color'
 
+            // Only pass necessary environment variables to avoid leaking sensitive data
+            const safeEnvVars = [
+              'PATH',
+              'HOME',
+              'LANG',
+              'LC_ALL',
+              'LC_CTYPE',
+              'NODE_ENV',
+            ]
+            const filteredEnv: { [key: string]: string } = {}
+            for (const key of safeEnvVars) {
+              if (process.env[key]) {
+                filteredEnv[key] = process.env[key]!
+              }
+            }
+
             ptyProcess = pty.spawn('node', [INK_APP_PATH], {
               name: termType,
               cols: session.ptyInfo.cols,
               rows: session.ptyInfo.rows,
               cwd: process.cwd(),
               env: {
-                ...process.env,
+                ...filteredEnv,
                 TERM: termType,
                 FORCE_COLOR: '3',
                 COLORTERM: 'truecolor',

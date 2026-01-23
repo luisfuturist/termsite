@@ -13,6 +13,9 @@ A personal site that lives in the terminal, built with React Ink and served over
 # Install dependencies
 pnpm install
 
+# Generate SSH host key (required for server)
+ssh-keygen -t ed25519 -f host.key -N "" -C "termsite-host-key"
+
 # Run locally
 pnpm dev
 
@@ -44,7 +47,31 @@ ssh -p 2222 localhost
 
 ## Deployment
 
-Deploy by committing to the `deploy` branch. Infrastructure is managed via Terraform - see `main.tf` for configuration.
+Deploy by pushing to the `deploy` branch. The application runs in Docker on Oracle Cloud Infrastructure.
+
+### Prerequisites
+
+1. **Infrastructure Setup**: Provision the server using Terraform
+   ```bash
+   terraform init
+   terraform apply
+   ```
+
+2. **GitHub Secrets**: Configure these secrets in your repository:
+   - `GH_TOKEN` - GitHub token for GHCR access
+   - `OCI_HOST` - Server IP address
+   - `OCI_SSH_KEY` - SSH private key for server access
+
+3. **Host Key**: The SSH host key is automatically generated on the server during provisioning. See [docs/HOST_KEY_SETUP.md](docs/HOST_KEY_SETUP.md) for details.
+
+### Deployment Process
+
+The GitHub Actions workflow automatically:
+1. Builds and pushes Docker image to GHCR
+2. Deploys to Oracle VM via SSH
+3. Pulls latest image and restarts container
+
+For more details on host key management, see [docs/HOST_KEY_SETUP.md](docs/HOST_KEY_SETUP.md).
 
 ## Development
 
@@ -59,10 +86,11 @@ pnpm lint:fix         # Auto-fix linting issues
 ## Project Structure
 
 ```
-src/
+app/
 ├── index.tsx          # CLI entry point
-├── server.tsx         # SSH server
 ├── App.tsx            # Main TUI app
 ├── components/        # UI components (Hero, Projects, ContactCta, etc.)
-└── lib/              # Utilities
+└── lib/               # Utilities
+server/
+└── main.ts            # SSH server
 ```

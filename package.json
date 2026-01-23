@@ -4,19 +4,20 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.14.0",
-  "main": "dist/index.js",
+  "main": "dist/app/index.js",
   "bin": {
-    "termsite": "dist/index.js"
+    "termsite": "dist/app/index.js"
   },
   "scripts": {
-    "dev": "tsx watch src/index.tsx",
+    "dev": "tsx watch app/index.tsx",
     "dev:build": "tsup --watch",
     "build": "tsup",
-    "start": "node dist/index.js",
-    "start:server": "node dist/server.js",
+    "start": "node dist/app/index.js",
+    "start:server": "node dist/server/main.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
-    "lint:fix": "eslint --fix"
+    "lint:fix": "eslint --fix",
+    "deploy": "git push origin main:deploy"
   },
   "dependencies": {
     "ink": "^6.6.0",
