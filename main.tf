@@ -1,30 +1,37 @@
+terraform {
+  required_version = ">= 1.3"
+  required_providers {
+    oci = {
+      source  = "oracle/oci"
+      version = ">= 5.0"
+    }
+  }
+}
+
 provider "oci" {
-  tenancy_ocid     = var.tenancy_ocid
-  user_ocid        = var.user_ocid
-  fingerprint      = var.fingerprint
-  private_key_path = var.private_key_path
-  region           = var.region
+  region = var.region
 }
 
-# VCN
-resource "oci_core_virtual_network" "vcn" {
+# Variables
+variable "compartment_ocid" {}
+variable "region" {}
+variable "ssh_public_key" {}
+
+# Networking
+resource "oci_core_vcn" "vcn" {
   compartment_id = var.compartment_ocid
-  display_name   = "tf-vcn"
   cidr_block     = "10.0.0.0/16"
+  display_name   = "termsite-vcn"
 }
 
-# Internet Gateway
 resource "oci_core_internet_gateway" "igw" {
-  compartment_id     = var.compartment_ocid
-  display_name       = "tf-igw"
-  virtual_network_id = oci_core_virtual_network.vcn.id
+  compartment_id = var.compartment_ocid
+  vcn_id         = oci_core_vcn.vcn.id
 }
 
-# Route Table
 resource "oci_core_route_table" "rt" {
-  compartment_id     = var.compartment_ocid
-  display_name       = "tf-rt"
-  virtual_network_id = oci_core_virtual_network.vcn.id
+  compartment_id = var.compartment_ocid
+  vcn_id         = oci_core_vcn.vcn.id
 
   route_rules {
     destination       = "0.0.0.0/0"
@@ -32,28 +39,25 @@ resource "oci_core_route_table" "rt" {
   }
 }
 
-# Public Subnet
-resource "oci_core_subnet" "public_subnet" {
-  compartment_id     = var.compartment_ocid
-  virtual_network_id = oci_core_virtual_network.vcn.id
-  cidr_block         = "10.0.0.0/24"
-  display_name       = "tf-public-subnet"
-  route_table_id     = oci_core_route_table.rt.id
-  prohibit_public_ip_on_vnic = false
-}
-
-# Security List (allow SSH)
 resource "oci_core_security_list" "sl" {
-  compartment_id     = var.compartment_ocid
-  virtual_network_id = oci_core_virtual_network.vcn.id
-  display_name       = "tf-sl"
+  compartment_id = var.compartment_ocid
+  vcn_id         = oci_core_vcn.vcn.id
 
   ingress_security_rules {
-    protocol = "6" # TCP
+    protocol = "6"
     source   = "0.0.0.0/0"
     tcp_options {
       min = 22
       max = 22
+    }
+  }
+
+  ingress_security_rules {
+    protocol = "6"
+    source   = "0.0.0.0/0"
+    tcp_options {
+      min = 2222
+      max = 2222
     }
   }
 
@@ -63,37 +67,54 @@ resource "oci_core_security_list" "sl" {
   }
 }
 
-# Compute Instance
-resource "oci_core_instance" "vm" {
-  compartment_id       = var.compartment_ocid
-  availability_domain  = var.ad
-  display_name         = "tf-vm"
-  shape                = "VM.Standard.E2.1.Micro"
+resource "oci_core_subnet" "subnet" {
+  compartment_id = var.compartment_ocid
+  vcn_id         = oci_core_vcn.vcn.id
+  cidr_block     = "10.0.1.0/24"
+  route_table_id = oci_core_route_table.rt.id
+  security_list_ids = [oci_core_security_list.sl.id]
+  prohibit_public_ip_on_vnic = false
+}
 
-  create_vnic_details {
-    subnet_id        = oci_core_subnet.public_subnet.id
-    assign_public_ip = true
-    display_name     = "tf-vnic"
-  }
+# Compute
+
+data "oci_identity_availability_domains" "ads" {
+  compartment_id = var.compartment_ocid
+}
+
+
+data "oci_core_images" "ubuntu" {
+  compartment_id           = var.compartment_ocid
+  operating_system         = "Canonical Ubuntu"
+  operating_system_version = "22.04"
+  shape                    = "VM.Standard.E2.1.Micro"
+  sort_by                  = "TIMECREATED"
+  sort_order               = "DESC"
+}
+
+resource "oci_core_instance" "vm" {
+  compartment_id      = var.compartment_ocid
+  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+  shape               = "VM.Standard.E2.1.Micro"
 
   source_details {
     source_type = "image"
-    image_id    = var.ubuntu_image_id
+    source_id   = data.oci_core_images.ubuntu.images[0].id
+  }
+
+  create_vnic_details {
+    subnet_id      = oci_core_subnet.subnet.id
+    assign_public_ip = true
   }
 
   metadata = {
-    ssh_authorized_keys = file(var.public_ssh_key_path)
+    ssh_authorized_keys = var.ssh_public_key
+    user_data = base64encode(file("cloud-init.yaml"))
   }
 }
 
-# Output the public IP
-output "OCI_HOST" {
-  value = oci_core_instance.vm.public_ip
-  description = "Public IP of the VM for SSH"
-}
+# Outputs
 
-# Helper for SSH private key path
-output "OCI_SSH_KEY" {
-  value = var.private_ssh_key_path
-  description = "Path to your local private SSH key"
+output "public_ip" {
+  value = oci_core_instance.vm.public_ip
 }

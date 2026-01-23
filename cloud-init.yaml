@@ -1,0 +1,23 @@
+# cloud-config
+package_update: true
+package_upgrade: true
+
+packages:
+  - git
+  - curl
+
+runcmd:
+  # Install Node.js 20
+  - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  - apt-get install -y nodejs
+  # Install pnpm
+  - curl -fsSL https://get.pnpm.io/install.sh | sh -
+  - export PNPM_HOME="/root/.local/share/pnpm"
+  - export PATH="$PNPM_HOME:$PATH"
+  # Clone and setup project
+  - git clone https://github.com/luisfuturist/termsite.git /opt/termsite
+  - cd /opt/termsite
+  - /root/.local/share/pnpm/pnpm install
+  - /root/.local/share/pnpm/pnpm build
+  # Start SSH server
+  - nohup /root/.local/share/pnpm/pnpm start:server > /var/log/termsite.log 2>&1 &

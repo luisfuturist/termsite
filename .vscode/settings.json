@@ -54,8 +54,9 @@
 
   "files.exclude": {
     "**/node_modules": true,
-    "**/dist": false,
-    "**/.terraform": true
+    "**/dist": true,
+    "**/.terraform": true,
+    "**/.pnpm-store": true
   },
 
   "typescript.tsdk": "node_modules/typescript/lib",
@@ -63,7 +64,7 @@
   "explorer.fileNesting.enabled": true,
   "explorer.fileNesting.patterns": {
     "package.json": "pnpm-lock.yaml, tsconfig.json, eslint.config.js, tsup.config.ts",
-    "main.tf": "variables.tf, terraform.tfvars, .terraform.lock.hcl",
+    "main.tf": ".terraform.lock.hcl",
     ".env.example": ".env*",
     "terraform.tfvars.example": "terraform.tfvars*"
   }
