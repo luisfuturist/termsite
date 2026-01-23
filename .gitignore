@@ -4,8 +4,11 @@ dist
 !.env.example
 .pnpm-store
 
-.terraform
-terraform.tfvars*
-!terraform.tfvars.example
 *.pem
 *.key
+
+terraform.tfvars*
+!terraform.tfvars.example
+**/.terraform/*
+*.tfstate
+*.tfstate.*
