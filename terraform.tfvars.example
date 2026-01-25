@@ -1,3 +1,13 @@
-region               = "sa-saopaulo-1"
-compartment_ocid     = ""
-ssh_public_key       = ""
+# Oracle Cloud Infrastructure region
+# Options: us-ashburn-1, us-phoenix-1, sa-saopaulo-1, etc.
+# See: https://docs.oracle.com/en-us/iaas/Content/General/Concepts/regions.htm
+region = "sa-saopaulo-1"
+
+# Compartment OCID from OCI Console
+# Find at: Identity & Security → Compartments
+compartment_ocid = ""
+
+# Your SSH public key for server access (port 22)
+# Generate with: ssh-keygen -t ed25519
+# Use the content of your ~/.ssh/id_ed25519.pub or similar
+ssh_public_key = ""
