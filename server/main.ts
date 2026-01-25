@@ -28,7 +28,7 @@ new Server(
         // This TUI is public.
         ctx.accept()
       })
-      .on('session', (accept) => {
+      .on('session', (accept, _reject) => {
         const session = accept() as InkSshSession
 
         let stream: ServerChannel
@@ -81,12 +81,15 @@ new Server(
         })
 
         session.on('window-change', (accept, _reject, info) => {
+          if (accept) {
+            accept()
+          }
+
           if (session.ptyInfo) {
             session.ptyInfo.rows = info.rows
             session.ptyInfo.cols = info.cols
           }
           resize()
-          accept()
         })
 
         session.on('exec', (accept, _reject, info) => {
@@ -100,7 +103,7 @@ new Server(
           stream.end()
         })
 
-        session.on('shell', (accept) => {
+        session.on('shell', (accept, _reject) => {
           stream = accept()
 
           if (!hasPty) {
