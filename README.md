@@ -5,11 +5,15 @@
 
 > SSH-accessible Terminal User Interface (TUI) for luisfuturist.com
 
-A personal site that lives in the terminal, built with React Ink and served over SSH. Navigate using keyboard shortcuts, view portfolio projects from GitHub, and interact with a retro-futuristic interface.
+A personal site that lives in the terminal, built with React Ink and served over SSH. Navigate using keyboard shortcuts and interact with a retro-futuristic interface.
 
 ## Quick Start
 
 ```bash
+# Clone the repository and cd into it
+git clone https://github.com/luisfuturist/termsite.git
+cd termsite
+
 # Install dependencies
 pnpm install
 
@@ -23,7 +27,7 @@ pnpm dev
 pnpm build
 
 # Start SSH server (port 2222)
-pnpm start:server
+pnpm start
 
 # Connect to the SSH server
 ssh -p 2222 localhost
@@ -43,45 +47,63 @@ ssh -p 2222 localhost
 - **UI**: [React](https://react.dev/) + [Ink](https://github.com/vadimdemedes/ink)
 - **Server**: [ssh2](https://github.com/mscdex/ssh2) + [node-pty](https://github.com/microsoft/node-pty)
 - **Build**: TypeScript + [tsup](https://tsup.egoist.dev/)
-- **Infrastructure**: Terraform
-
-## Deployment
-
-Deploy by pushing to the `deploy` branch. The application runs in Docker on Oracle Cloud Infrastructure.
-
-### Prerequisites
-
-1. **Infrastructure Setup**: Provision the server using Terraform
-   ```bash
-   terraform init
-   terraform apply
-   ```
-
-2. **GitHub Secrets**: Configure these secrets in your repository:
-   - `GH_TOKEN` - GitHub token for GHCR access
-   - `OCI_HOST` - Server IP address
-   - `OCI_SSH_KEY` - SSH private key for server access
-
-3. **Host Key**: The SSH host key is automatically generated on the server during provisioning. See [docs/HOST_KEY_SETUP.md](docs/HOST_KEY_SETUP.md) for details.
-
-### Deployment Process
-
-The GitHub Actions workflow automatically:
-1. Builds and pushes Docker image to GHCR
-2. Deploys to Oracle VM via SSH
-3. Pulls latest image and restarts container
-
-For more details on host key management, see [docs/HOST_KEY_SETUP.md](docs/HOST_KEY_SETUP.md).
+- **Infrastructure**: Terraform + Docker + Oracle Cloud Infrastructure
 
 ## Development
 
 ```bash
 pnpm dev              # Watch mode with hot reload
-pnpm dev:build        # Watch build output
 pnpm typecheck        # Run type checking
 pnpm lint             # Lint code
 pnpm lint:fix         # Auto-fix linting issues
 ```
+
+## Infrastructure
+
+### Initial Setup
+
+1. **Configure Terraform** (first time only)
+
+   ```bash
+   # Create terraform.tfvars with your OCI credentials
+   cp terraform.tfvars.example terraform.tfvars
+   # Edit terraform.tfvars with your values
+   ```
+
+2. **Provision infrastructure**
+
+   ```bash
+   terraform init
+   terraform apply
+   ```
+
+3. **Wait for cloud-init** (installs Docker, ~5 minutes)
+
+   ```bash
+   ssh ubuntu@$(terraform output -raw public_ip)
+   cloud-init status --wait
+   ```
+
+### Destroying
+
+```bash
+terraform destroy
+```
+
+## Releasing
+
+1. **Setup .env file**
+
+   ```bash
+   cp .env.example .env
+   # Edit .env with your values
+   ```
+
+2. **Release**
+
+   ```bash
+   pnpm release
+   ```
 
 ## Project Structure
 

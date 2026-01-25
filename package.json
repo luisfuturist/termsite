@@ -1,7 +1,6 @@
 {
   "name": "termsite",
   "type": "module",
-  "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@10.14.0",
   "main": "dist/app/index.js",
@@ -15,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
-    "deploy": "git push origin main:deploy"
+    "release": "bash scripts/release.sh"
   },
   "dependencies": {
     "ink": "^6.6.0",

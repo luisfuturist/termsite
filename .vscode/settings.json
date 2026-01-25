@@ -64,9 +64,15 @@
   "explorer.fileNesting.enabled": true,
   "explorer.fileNesting.patterns": {
     "package.json": "pnpm-lock.yaml, tsconfig.json, eslint.config.js, tsup.config.ts",
-    "main.tf": ".terraform.lock.hcl, cloud-init.yaml, terraform.tfstate, terraform.tfstate.*",
+    "main.tf": "cloud-init.yaml",
+    ".terraform.lock.hcl": "terraform.tfstate*, .terraform.tfstate*",
     ".env.example": ".env*",
     "terraform.tfvars.example": "terraform.tfvars*",
-    "docker-compose.yml": "Dockerfile, .dockerignore"
+    "docker-compose.yml": "Dockerfile, .dockerignore",
+    "host.key.pub": "host.key"
+  },
+
+  "files.associations": {
+    "*.md": "markdown"
   }
 }
