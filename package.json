@@ -2,7 +2,7 @@
   "name": "termsite",
   "type": "module",
   "private": true,
-  "packageManager": "pnpm@10.14.0",
+  "packageManager": "pnpm@10.27.0",
   "main": "dist/app/index.js",
   "bin": {
     "termsite": "dist/app/index.js"

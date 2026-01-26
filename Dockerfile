@@ -9,8 +9,8 @@ RUN apt-get update && \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-# Install pnpm
-RUN npm install -g pnpm@10.14.0
+# Install pnpm (updated to fix CVE-2025-69262, CVE-2025-69263, CVE-2025-69264)
+RUN npm install -g pnpm@10.27.0
 
 WORKDIR /app
 
@@ -43,15 +43,16 @@ RUN apt-get update && \
 RUN groupadd -r termsite && useradd -r -g termsite -s /bin/false termsite
 
 # Install pnpm
-RUN npm install -g pnpm@10.14.0
+RUN npm install -g pnpm@10.27.0
 
 WORKDIR /app
 
 # Copy package files first
-COPY --from=builder /app/package.json ./
+COPY --from=builder /app/package.json /app/pnpm-lock.yaml ./
 
 # Install ONLY production dependencies (no dev deps)
-RUN pnpm install --prod --frozen-lockfile
+RUN pnpm install --prod --frozen-lockfile && \
+    pnpm store prune
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
@@ -69,6 +70,6 @@ EXPOSE 2222
 
 # Add health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('net').connect(2222, 'localhost')" || exit 1
+  CMD node -e "require('net').connect(2222, 'localhost').on('connect', () => process.exit(0)).on('error', () => process.exit(1))"
 
 CMD ["node", "dist/server/main.js"]
