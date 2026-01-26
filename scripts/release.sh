@@ -22,6 +22,12 @@ if [ -z "$GH_TOKEN" ]; then
     exit 1
 fi
 
+# Ensure user is authenticated with GitHub CLI
+if ! gh auth status >/dev/null 2>&1; then
+    log_error "Not authenticated with GitHub CLI. Run 'gh auth login' first."
+    exit 1
+fi
+
 # Configuration
 IMAGE_NAME="ghcr.io/${GH_USERNAME}/termsite:latest"
 
@@ -95,7 +101,7 @@ deploy_to_oci() {
     # Wait for Docker to be ready (in case cloud-init just finished)
     log_info "Checking if Docker is ready..."
     for i in {1..30}; do
-        if ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "docker --version" >/dev/null 2>&1; then
+        if ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "sudo docker --version" >/dev/null 2>&1; then
             break
         fi
         if [ $i -eq 30 ]; then
@@ -106,15 +112,15 @@ deploy_to_oci() {
     
     # Pull latest image
     log_info "Pulling image..."
-    ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "docker pull ${IMAGE_NAME}"
+    ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "sudo docker pull ${IMAGE_NAME}"
     
     # Stop and remove old container
     log_info "Stopping old container..."
-    ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "docker stop termsite 2>/dev/null || true && docker rm termsite 2>/dev/null || true"
+    ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "sudo docker stop termsite 2>/dev/null || true && sudo docker rm termsite 2>/dev/null || true"
     
     # Start new container
     log_info "Starting new container..."
-    ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "docker run -d \
+    ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "sudo docker run -d \
         --name termsite \
         --restart unless-stopped \
         -p 2222:2222 \
@@ -124,11 +130,11 @@ deploy_to_oci() {
     
     # Verify deployment
     sleep 5
-    if ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "docker ps | grep termsite" >/dev/null; then
+    if ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "sudo docker ps | grep termsite" >/dev/null; then
         log_success "Deployment complete!"
         log_info "Connect with: ssh -p 2222 anyuser@${SERVER_IP}"
     else
-        log_error "Container failed to start. Check logs with: ssh ubuntu@${SERVER_IP} 'docker logs termsite'"
+        log_error "Container failed to start. Check logs with: ssh ubuntu@${SERVER_IP} 'sudo docker logs termsite'"
     fi
 }
 
@@ -139,9 +145,9 @@ main() {
     echo ""
     
     login_docker
-    #build_image
+    build_image
     push_image
-    #deploy_to_oci
+    deploy_to_oci
     
     echo ""
     log_success "Release complete! 🚀"

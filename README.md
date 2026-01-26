@@ -105,6 +105,8 @@ terraform destroy
    pnpm release
    ```
 
+   **Note:** Ensure your image is public on GHCR.
+
 ## Project Structure
 
 ```
