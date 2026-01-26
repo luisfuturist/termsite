@@ -9,13 +9,15 @@ dist
 .env*
 !.env.example
 
-# Keys and secrets
+# Keys and secrets (excluded from Docker image, but mounted at runtime)
 *.key
+*.key.pub
 *.pem
 host.key
 host.key.pub
 
 # Terraform
+*.tf
 terraform.tfvars*
 !terraform.tfvars.example
 .terraform/

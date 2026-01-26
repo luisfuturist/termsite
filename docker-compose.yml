@@ -8,8 +8,7 @@ services:
     ports:
       - "2222:2222"
     volumes:
-      # Persist host key across container restarts
-      - ./host.key:/app/host.key
+      - ./host.key:/app/host.key:ro
     environment:
       - NODE_ENV=production
     healthcheck:

@@ -34,36 +34,41 @@ RUN pnpm build
 # Production stage
 FROM node:20-slim
 
-# Install openssh-client for key generation
+# Install security updates
 RUN apt-get update && \
-    apt-get install -y openssh-client && \
+    apt-get upgrade -y && \
     rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r termsite && useradd -r -g termsite -s /bin/false termsite
 
 # Install pnpm
 RUN npm install -g pnpm@10.14.0
 
 WORKDIR /app
 
-# Copy built application and dependencies
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
+# Copy package files first
 COPY --from=builder /app/package.json ./
 
-# Create a startup script that generates host key if it doesn't exist
-RUN echo '#!/bin/bash\n\
-set -e\n\
-\n\
-# Generate host key if it does not exist\n\
-if [ ! -f /app/host.key ]; then\n\
-  echo "Generating SSH host key..."\n\
-  ssh-keygen -t ed25519 -f /app/host.key -N "" -C "termsite-host-key"\n\
-  echo "Host key generated successfully"\n\
-fi\n\
-\n\
-# Start the server\n\
-exec node dist/server/main.js\n\
-' > /app/start.sh && chmod +x /app/start.sh
+# Install ONLY production dependencies (no dev deps)
+RUN pnpm install --prod --frozen-lockfile
+
+# Copy built application
+COPY --from=builder /app/dist ./dist
+
+# Copy node-pty binary (required native module)
+COPY --from=builder /app/node_modules/.pnpm/node-pty@1.1.0/node_modules/node-pty ./node_modules/.pnpm/node-pty@1.1.0/node_modules/node-pty
+
+# Change ownership to non-root user
+RUN chown -R termsite:termsite /app
+
+# Switch to non-root user
+USER termsite
 
 EXPOSE 2222
 
-CMD ["/app/start.sh"]
+# Add health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('net').connect(2222, 'localhost')" || exit 1
+
+CMD ["node", "dist/server/main.js"]

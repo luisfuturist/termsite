@@ -11,8 +11,19 @@ if [ -f ".env" ]; then
     export $(grep -v '^#' .env | xargs)
 fi
 
+# Check if environment variables are set
+if [ -z "$GH_USERNAME" ]; then
+    log_error "GH_USERNAME not set. Add it to .env file or export GH_USERNAME=..."
+    exit 1
+fi
+
+if [ -z "$GH_TOKEN" ]; then
+    log_error "GH_TOKEN not set. Add it to .env file or export GH_TOKEN=ghp_..."
+    exit 1
+fi
+
 # Configuration
-IMAGE_NAME="ghcr.io/${GH_USERNAME:-luisfuturist}/termsite:latest"
+IMAGE_NAME="ghcr.io/${GH_USERNAME}/termsite:latest"
 
 # Colors
 RED='\033[0;31m'
@@ -42,15 +53,6 @@ get_server_ip() {
 # Login to GitHub Container Registry
 login_docker() {
     log_info "Logging into GitHub Container Registry..."
-    
-    if [ -z "$GH_TOKEN" ]; then
-        log_error "GH_TOKEN not set. Add it to .env file or export GH_TOKEN=ghp_..."
-    fi
-    
-    if [ -z "$GH_USERNAME" ]; then
-        log_error "GH_USERNAME not set. Add it to .env file or export GH_USERNAME=..."
-    fi
-    
     echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_USERNAME" --password-stdin
     log_success "Docker login successful"
 }
@@ -75,32 +77,44 @@ deploy_to_oci() {
     log_info "Deploying to ${SERVER_IP}..."
     
     # Test SSH connection
-    if ! ssh -o ConnectTimeout=5 ubuntu@${SERVER_IP} "echo 'ok'" >/dev/null 2>&1; then
+    if ! ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "echo 'ok'" >/dev/null 2>&1; then
         log_error "Cannot connect to ubuntu@${SERVER_IP}. Check SSH configuration."
     fi
     log_success "Connected to server"
     
     # Setup deployment directory
-    ssh ubuntu@${SERVER_IP} "mkdir -p /opt/termsite"
+    ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "sudo mkdir -p /opt/termsite && sudo chown ubuntu:ubuntu /opt/termsite"
     
     # Generate SSH host key if needed
-    if ! ssh ubuntu@${SERVER_IP} "test -f /opt/termsite/host.key"; then
+    if ! ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "test -f /opt/termsite/host.key"; then
         log_info "Generating SSH host key..."
-        ssh ubuntu@${SERVER_IP} "ssh-keygen -t ed25519 -f /opt/termsite/host.key -N '' -C 'termsite-host-key' && chmod 600 /opt/termsite/host.key"
+        ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "ssh-keygen -t ed25519 -f /opt/termsite/host.key -N '' -C 'termsite-host-key' && chmod 600 /opt/termsite/host.key"
         log_success "SSH host key generated"
     fi
     
+    # Wait for Docker to be ready (in case cloud-init just finished)
+    log_info "Checking if Docker is ready..."
+    for i in {1..30}; do
+        if ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "docker --version" >/dev/null 2>&1; then
+            break
+        fi
+        if [ $i -eq 30 ]; then
+            log_error "Docker is not available on the server. Cloud-init may still be running."
+        fi
+        sleep 2
+    done
+    
     # Pull latest image
     log_info "Pulling image..."
-    ssh ubuntu@${SERVER_IP} "docker pull ${IMAGE_NAME}"
+    ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "docker pull ${IMAGE_NAME}"
     
     # Stop and remove old container
     log_info "Stopping old container..."
-    ssh ubuntu@${SERVER_IP} "docker stop termsite 2>/dev/null || true && docker rm termsite 2>/dev/null || true"
+    ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "docker stop termsite 2>/dev/null || true && docker rm termsite 2>/dev/null || true"
     
     # Start new container
     log_info "Starting new container..."
-    ssh ubuntu@${SERVER_IP} "docker run -d \
+    ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "docker run -d \
         --name termsite \
         --restart unless-stopped \
         -p 2222:2222 \
@@ -110,7 +124,7 @@ deploy_to_oci() {
     
     # Verify deployment
     sleep 5
-    if ssh ubuntu@${SERVER_IP} "docker ps | grep termsite" >/dev/null; then
+    if ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "docker ps | grep termsite" >/dev/null; then
         log_success "Deployment complete!"
         log_info "Connect with: ssh -p 2222 anyuser@${SERVER_IP}"
     else
@@ -125,9 +139,9 @@ main() {
     echo ""
     
     login_docker
-    build_image
+    #build_image
     push_image
-    deploy_to_oci
+    #deploy_to_oci
     
     echo ""
     log_success "Release complete! 🚀"
