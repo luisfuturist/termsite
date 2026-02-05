@@ -78,6 +78,43 @@ resource "oci_core_subnet" "subnet" {
   prohibit_public_ip_on_vnic = false
 }
 
+# Network Security Group (if NSGs are attached to VNIC, they override Security Lists)
+resource "oci_core_network_security_group" "nsg" {
+  compartment_id = var.compartment_ocid
+  vcn_id         = oci_core_vcn.vcn.id
+  display_name   = "termsite-nsg"
+}
+
+resource "oci_core_network_security_group_security_rule" "ssh_22" {
+  network_security_group_id = oci_core_network_security_group.nsg.id
+  direction                 = "INGRESS"
+  protocol                  = "6" # TCP
+  source                    = "0.0.0.0/0"
+  description               = "Allow TCP 22 for application SSH server"
+
+  tcp_options {
+    destination_port_range {
+      min = 22
+      max = 22
+    }
+  }
+}
+
+resource "oci_core_network_security_group_security_rule" "ssh_2200" {
+  network_security_group_id = oci_core_network_security_group.nsg.id
+  direction                 = "INGRESS"
+  protocol                  = "6" # TCP
+  source                    = "0.0.0.0/0"
+  description               = "Allow TCP 2200 for system SSH (moved from port 22 by cloud-init)"
+
+  tcp_options {
+    destination_port_range {
+      min = 2200
+      max = 2200
+    }
+  }
+}
+
 # Compute
 
 data "oci_identity_availability_domains" "ads" {
@@ -107,6 +144,7 @@ resource "oci_core_instance" "vm" {
   create_vnic_details {
     subnet_id      = oci_core_subnet.subnet.id
     assign_public_ip = true
+    nsg_ids        = [oci_core_network_security_group.nsg.id]
   }
 
   metadata = {

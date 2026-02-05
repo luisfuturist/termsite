@@ -4,22 +4,21 @@ package_upgrade: true
 
 packages:
   - docker.io
-  - policycoreutils # Required for semanage
 
 runcmd:
-  # 1. Tell SELinux port 2200 is okay for SSH (Crucial for OCI)
-  - semanage port -a -t ssh_port_t -p tcp 2200 || semanage port -m -t ssh_port_t -p tcp 2200
+  # Remove all existing Port directives
+  - sed -i '/^Port[[:space:]]/d' /etc/ssh/sshd_config
 
-  # 2. Change SSH Port
-  - sed -i 's/^#Port 22/Port 2200/' /etc/ssh/sshd_config
-  - sed -i 's/^Port 22/Port 2200/' /etc/ssh/sshd_config
+  # Set SSH port explicitly
+  - echo 'Port 2200' >> /etc/ssh/sshd_config
+
+  # Validate before restart
+  - sshd -t
+
+  # Restart SSH
   - systemctl restart sshd
 
-  # 3. Open Firewall (Standard Ubuntu UFW)
+  # Firewall
   - ufw allow 2200/tcp
   - ufw allow 22/tcp
   - ufw --force enable
-
-  # 4. Docker Setup
-  - systemctl enable --now docker
-  - usermod -aG docker ubuntu
