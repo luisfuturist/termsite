@@ -12,6 +12,7 @@ const { Server } = ssh2
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const INK_APP_PATH = path.join(__dirname, '..', 'app', 'index.js')
+const PORT = process.env.PORT ? Number.parseInt(process.env.PORT) : 22
 
 interface InkSshSession extends Session {
   ptyInfo?: PseudoTtyInfo
@@ -181,7 +182,7 @@ new Server(
       })
   },
 )
-  .listen(2222, '0.0.0.0', function (this: ServerType) {
+  .listen(PORT, '0.0.0.0', function (this: ServerType) {
     const addr = this.address()
     if (addr && typeof addr !== 'string') {
     // eslint-disable-next-line no-console

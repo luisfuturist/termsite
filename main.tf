@@ -44,8 +44,9 @@ resource "oci_core_security_list" "sl" {
   vcn_id         = oci_core_vcn.vcn.id
 
   ingress_security_rules {
-    protocol = "6"
-    source   = "0.0.0.0/0"
+    description = "Allow TCP 22 for application SSH server"
+    protocol    = "6"
+    source      = "0.0.0.0/0"
     tcp_options {
       min = 22
       max = 22
@@ -53,11 +54,12 @@ resource "oci_core_security_list" "sl" {
   }
 
   ingress_security_rules {
-    protocol = "6"
-    source   = "0.0.0.0/0"
+    description = "Allow TCP 2200 for system SSH (moved from port 22 by cloud-init)"
+    protocol    = "6"
+    source      = "0.0.0.0/0"
     tcp_options {
-      min = 2222
-      max = 2222
+      min = 2200
+      max = 2200
     }
   }
 
@@ -109,7 +111,7 @@ resource "oci_core_instance" "vm" {
 
   metadata = {
     ssh_authorized_keys = var.ssh_public_key
-    user_data = base64gzip(file("cloud-init.yaml"))
+    user_data = base64encode(file("${path.module}/cloud-init.yaml"))
   }
 }
 

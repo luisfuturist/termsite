@@ -66,10 +66,10 @@ RUN chown -R termsite:termsite /app
 # Switch to non-root user
 USER termsite
 
-EXPOSE 2222
+EXPOSE 22
 
 # Add health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('net').connect(2222, 'localhost').on('connect', () => process.exit(0)).on('error', () => process.exit(1))"
+  CMD node -e "require('net').connect(22, 'localhost').on('connect', () => process.exit(0)).on('error', () => process.exit(1))"
 
 CMD ["node", "dist/server/main.js"]

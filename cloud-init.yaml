@@ -1,14 +1,25 @@
-# cloud-config
+#cloud-config
 package_update: true
 package_upgrade: true
 
 packages:
   - docker.io
+  - policycoreutils # Required for semanage
 
 runcmd:
-  # Add ubuntu user to docker group
-  - usermod -aG docker ubuntu
+  # 1. Tell SELinux port 2200 is okay for SSH (Crucial for OCI)
+  - semanage port -a -t ssh_port_t -p tcp 2200 || semanage port -m -t ssh_port_t -p tcp 2200
 
-  # Enable Docker service
-  - systemctl enable docker
-  - systemctl start docker
+  # 2. Change SSH Port
+  - sed -i 's/^#Port 22/Port 2200/' /etc/ssh/sshd_config
+  - sed -i 's/^Port 22/Port 2200/' /etc/ssh/sshd_config
+  - systemctl restart sshd
+
+  # 3. Open Firewall (Standard Ubuntu UFW)
+  - ufw allow 2200/tcp
+  - ufw allow 22/tcp
+  - ufw --force enable
+
+  # 4. Docker Setup
+  - systemctl enable --now docker
+  - usermod -aG docker ubuntu

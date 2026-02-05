@@ -10,10 +10,11 @@
   "scripts": {
     "dev": "tsx watch app/index.tsx",
     "build": "tsup",
-    "start": "node dist/server/main.js",
+    "start": "PORT=2222 node dist/server/main.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
+    "check": "pnpm lint && pnpm typecheck",
     "release": "bash scripts/release.sh"
   },
   "dependencies": {

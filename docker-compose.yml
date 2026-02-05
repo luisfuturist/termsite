@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
     container_name: termsite
     restart: unless-stopped
+    # Local development uses port 2222 to avoid conflict with system SSH on port 22
+    # Production deployment (via release.sh) uses port 22
     ports:
       - "2222:2222"
     volumes:

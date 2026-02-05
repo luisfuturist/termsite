@@ -82,59 +82,64 @@ deploy_to_oci() {
     local SERVER_IP=$(get_server_ip)
     log_info "Deploying to ${SERVER_IP}..."
     
-    # Test SSH connection
-    if ! ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "echo 'ok'" >/dev/null 2>&1; then
-        log_error "Cannot connect to ubuntu@${SERVER_IP}. Check SSH configuration."
+    # Test SSH connection on port 2200
+    local SSH_PORT=2200
+    log_info "Testing SSH connection on port 2200..."
+    if ! ssh -p ${SSH_PORT} -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "echo 'ok'" >/dev/null 2>&1; then
+        log_error "Cannot connect to ubuntu@${SERVER_IP} on port 2200. Check SSH configuration."
     fi
-    log_success "Connected to server"
+    log_success "Connected to server on port ${SSH_PORT}"
     
     # Setup deployment directory
-    ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "sudo mkdir -p /opt/termsite && sudo chown ubuntu:ubuntu /opt/termsite"
+    ssh -p ${SSH_PORT} -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "sudo mkdir -p /opt/termsite && sudo chown ubuntu:ubuntu /opt/termsite"
     
     # Generate SSH host key if needed
-    if ! ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "test -f /opt/termsite/host.key"; then
+    if ! ssh -p ${SSH_PORT} -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "test -f /opt/termsite/host.key"; then
         log_info "Generating SSH host key..."
-        ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "ssh-keygen -t ed25519 -f /opt/termsite/host.key -N '' -C 'termsite-host-key' && chmod 600 /opt/termsite/host.key"
+        ssh -p ${SSH_PORT} -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "ssh-keygen -t ed25519 -f /opt/termsite/host.key -N '' -C 'termsite-host-key' && chmod 600 /opt/termsite/host.key"
         log_success "SSH host key generated"
     fi
     
     # Wait for Docker to be ready (in case cloud-init just finished)
     log_info "Checking if Docker is ready..."
     for i in {1..30}; do
-        if ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "sudo docker --version" >/dev/null 2>&1; then
+        if ssh -p ${SSH_PORT} -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "sudo docker --version" >/dev/null 2>&1; then
             break
         fi
         if [ $i -eq 30 ]; then
-            log_error "Docker is not available on the server. Cloud-init may still be running."
+            log_error "Docker is not available on the server.."
         fi
         sleep 2
     done
     
     # Pull latest image
     log_info "Pulling image..."
-    ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "sudo docker pull ${IMAGE_NAME}"
+    ssh -p ${SSH_PORT} -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "sudo docker pull ${IMAGE_NAME}"
     
     # Stop and remove old container
     log_info "Stopping old container..."
-    ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "sudo docker stop termsite 2>/dev/null || true && sudo docker rm termsite 2>/dev/null || true"
+    ssh -p ${SSH_PORT} -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "sudo docker stop termsite 2>/dev/null || true && sudo docker rm termsite 2>/dev/null || true"
     
     # Start new container
     log_info "Starting new container..."
-    ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "sudo docker run -d \
+    ssh -p ${SSH_PORT} -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "sudo docker run -d \
         --name termsite \
         --restart unless-stopped \
-        -p 2222:2222 \
+        --cap-add=NET_BIND_SERVICE \
+        -p 22:22 \
         -v /opt/termsite/host.key:/app/host.key \
         -e NODE_ENV=production \
+        -e PORT=22 \
         ${IMAGE_NAME}"
     
     # Verify deployment
     sleep 5
-    if ssh -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "sudo docker ps | grep termsite" >/dev/null; then
+    if ssh -p ${SSH_PORT} -o StrictHostKeyChecking=accept-new ubuntu@${SERVER_IP} "sudo docker ps | grep termsite" >/dev/null; then
         log_success "Deployment complete!"
-        log_info "Connect with: ssh -p 2222 anyuser@${SERVER_IP}"
+        log_info "Connect to application with: ssh anyuser@${SERVER_IP}"
+        log_info "Connect to server admin with: ssh -p 2200 ubuntu@${SERVER_IP}"
     else
-        log_error "Container failed to start. Check logs with: ssh ubuntu@${SERVER_IP} 'sudo docker logs termsite'"
+        log_error "Container failed to start. Check logs with: ssh -p ${SSH_PORT} ubuntu@${SERVER_IP} 'sudo docker logs termsite'"
     fi
 }
 
@@ -144,9 +149,9 @@ main() {
     log_info "Starting release process..."
     echo ""
     
-    login_docker
-    build_image
-    push_image
+    #login_docker
+    #build_image
+    #push_image
     deploy_to_oci
     
     echo ""

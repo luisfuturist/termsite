@@ -36,7 +36,7 @@ ssh -p 2222 localhost
 ## Features
 
 - 🎹 **Keyboard-first navigation** - `h` Home | `a` About | `p` Portfolio | `c` Contact | `q` Quit
-- 🔌 **SSH server** - Connect from anywhere: `ssh user@host -p 2222`
+- 🔌 **SSH server** - Connect from anywhere: `ssh user@host` (production) or `ssh -p 2222 localhost` (local dev)
 - 📱 **Responsive TUI** - Adapts to terminal size, fullscreen mode
 - 🎨 **React-based** - Built with Ink for component-driven terminal UIs
 - 🚀 **GitHub integration** - Dynamically fetches and displays portfolio projects
@@ -53,8 +53,7 @@ ssh -p 2222 localhost
 
 ```bash
 pnpm dev              # Watch mode with hot reload
-pnpm typecheck        # Run type checking
-pnpm lint             # Lint code
+pnpm check            # Lint and type check code
 pnpm lint:fix         # Auto-fix linting issues
 ```
 
@@ -77,12 +76,16 @@ pnpm lint:fix         # Auto-fix linting issues
    terraform apply
    ```
 
-3. **Wait for cloud-init** (installs Docker, ~5 minutes)
+3. **Wait for cloud-init** (installs Docker and moves SSH to port 2200, ~5 minutes)
 
    ```bash
+   # Initially connect on port 22 (before cloud-init finishes)
    ssh ubuntu@$(terraform output -raw public_ip)
    cloud-init status --wait
+   # After cloud-init, system SSH is on port 2200, app uses port 22
    ```
+
+   **Note:** After cloud-init completes, use `ssh -p 2200 ubuntu@$(terraform output -raw public_ip)` for server administration. The application runs on the default SSH port 22.
 
 ### Destroying
 
@@ -106,6 +109,18 @@ terraform destroy
    ```
 
    **Note:** Ensure your image is public on GHCR.
+
+   After deployment, connect to the application:
+
+   ```bash
+   ssh anyuser@$(terraform output -raw public_ip)
+   ```
+
+   For server administration:
+
+   ```bash
+   ssh -p 2200 ubuntu@$(terraform output -raw public_ip)
+   ```
 
 ## Project Structure
 
