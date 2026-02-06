@@ -1,7 +1,8 @@
 # TODO
 
-- Config DNS
+- Fix pre-quantum SSH key generation
 - Improve release script to avoid repetitive password prompts
+- Add responsive design
 
 - Add rate limiting to SSH server
 - Create systemd service for proper process management
@@ -10,6 +11,3 @@
 
 - Implement graceful shutdown
 - Add integration tests for deployment
-
-- Add responsive design
-- Draw scroll bar
