@@ -15,10 +15,15 @@ runcmd:
   # Validate before restart
   - sshd -t
 
-  # Restart SSH
-  - systemctl restart sshd
+  # Restart SSH (use 'ssh' service name on Ubuntu)
+  - systemctl restart ssh || systemctl restart sshd
 
-  # Firewall
-  - ufw allow 2200/tcp
-  - ufw allow 22/tcp
+  # Firewall - configure UFW before enabling
+  - ufw --force reset
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 2200/tcp comment 'SSH system access'
+  - ufw allow 22/tcp comment 'SSH application access'
   - ufw --force enable
+  - systemctl enable ufw
+  - systemctl start ufw

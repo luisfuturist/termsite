@@ -27,21 +27,28 @@ resource "oci_core_vcn" "vcn" {
 resource "oci_core_internet_gateway" "igw" {
   compartment_id = var.compartment_ocid
   vcn_id         = oci_core_vcn.vcn.id
+  display_name   = "termsite-internet-gateway"
+  enabled        = true
 }
 
 resource "oci_core_route_table" "rt" {
   compartment_id = var.compartment_ocid
   vcn_id         = oci_core_vcn.vcn.id
+  display_name   = "termsite-route-table"
 
   route_rules {
+    description       = "Default route to internet gateway"
     destination       = "0.0.0.0/0"
+    destination_type  = "CIDR_BLOCK"
     network_entity_id = oci_core_internet_gateway.igw.id
   }
 }
 
+# Security List (backup/fallback - NSG attached to VNIC takes precedence)
 resource "oci_core_security_list" "sl" {
   compartment_id = var.compartment_ocid
   vcn_id         = oci_core_vcn.vcn.id
+  display_name   = "termsite-security-list"
 
   ingress_security_rules {
     description = "Allow TCP 22 for application SSH server"
@@ -64,6 +71,7 @@ resource "oci_core_security_list" "sl" {
   }
 
   egress_security_rules {
+    description = "Allow all outbound traffic"
     protocol    = "all"
     destination = "0.0.0.0/0"
   }
@@ -73,23 +81,28 @@ resource "oci_core_subnet" "subnet" {
   compartment_id = var.compartment_ocid
   vcn_id         = oci_core_vcn.vcn.id
   cidr_block     = "10.0.1.0/24"
+  display_name   = "termsite-subnet"
   route_table_id = oci_core_route_table.rt.id
+  # Security list is kept for fallback, but NSG attached to VNIC takes precedence
   security_list_ids = [oci_core_security_list.sl.id]
   prohibit_public_ip_on_vnic = false
 }
 
-# Network Security Group (if NSGs are attached to VNIC, they override Security Lists)
+# Network Security Group (NSG attached to VNIC overrides Security Lists)
+# NSGs provide more granular, stateful firewall rules
 resource "oci_core_network_security_group" "nsg" {
   compartment_id = var.compartment_ocid
   vcn_id         = oci_core_vcn.vcn.id
   display_name   = "termsite-nsg"
 }
 
+# Ingress Rules
 resource "oci_core_network_security_group_security_rule" "ssh_22" {
   network_security_group_id = oci_core_network_security_group.nsg.id
   direction                 = "INGRESS"
   protocol                  = "6" # TCP
   source                    = "0.0.0.0/0"
+  source_type               = "CIDR_BLOCK"
   description               = "Allow TCP 22 for application SSH server"
 
   tcp_options {
@@ -105,6 +118,7 @@ resource "oci_core_network_security_group_security_rule" "ssh_2200" {
   direction                 = "INGRESS"
   protocol                  = "6" # TCP
   source                    = "0.0.0.0/0"
+  source_type               = "CIDR_BLOCK"
   description               = "Allow TCP 2200 for system SSH (moved from port 22 by cloud-init)"
 
   tcp_options {
@@ -113,6 +127,16 @@ resource "oci_core_network_security_group_security_rule" "ssh_2200" {
       max = 2200
     }
   }
+}
+
+# Egress Rules
+resource "oci_core_network_security_group_security_rule" "egress_all" {
+  network_security_group_id = oci_core_network_security_group.nsg.id
+  direction                 = "EGRESS"
+  protocol                  = "all"
+  destination               = "0.0.0.0/0"
+  destination_type          = "CIDR_BLOCK"
+  description               = "Allow all outbound traffic"
 }
 
 # Compute
@@ -151,6 +175,13 @@ resource "oci_core_instance" "vm" {
     ssh_authorized_keys = var.ssh_public_key
     user_data = base64encode(file("${path.module}/cloud-init.yaml"))
   }
+
+  # Ensure NSG rules are created before instance
+  depends_on = [
+    oci_core_network_security_group_security_rule.ssh_22,
+    oci_core_network_security_group_security_rule.ssh_2200,
+    oci_core_network_security_group_security_rule.egress_all
+  ]
 }
 
 # Outputs
@@ -158,3 +189,15 @@ resource "oci_core_instance" "vm" {
 output "public_ip" {
   value = oci_core_instance.vm.public_ip
 }
+
+output "instance_ocid" {
+  value       = oci_core_instance.vm.id
+  description = "Instance OCID for OCI CLI operations"
+}
+
+output "nsg_ocid" {
+  value       = oci_core_network_security_group.nsg.id
+  description = "NSG OCID for OCI CLI operations"
+}
+
+# Note: To get VNIC OCID, use: oci compute instance list-vnics --instance-id $(terraform output -raw instance_ocid) --query 'data[0].id' --raw-output

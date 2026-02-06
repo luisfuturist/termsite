@@ -149,9 +149,9 @@ main() {
     log_info "Starting release process..."
     echo ""
     
-    #login_docker
-    #build_image
-    #push_image
+    login_docker
+    build_image
+    push_image
     deploy_to_oci
     
     echo ""
