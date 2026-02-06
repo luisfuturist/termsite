@@ -2,6 +2,7 @@
 
 > [!IMPORTANT]
 > This project is still a work in progress.
+> You can try the current version by running this command in your terminal: `ssh wwt.luisfuturist.com`
 
 > SSH-accessible Terminal User Interface (TUI) for luisfuturist.com
 
