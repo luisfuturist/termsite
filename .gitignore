@@ -12,3 +12,6 @@ terraform.tfvars*
 **/.terraform/*
 *.tfstate
 *.tfstate.*
+
+# myco worktree mount point (created by `myco init`)
+project/
