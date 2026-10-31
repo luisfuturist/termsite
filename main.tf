@@ -175,13 +175,6 @@ resource "oci_core_instance" "vm" {
     ssh_authorized_keys = var.ssh_public_key
     user_data = base64encode(file("${path.module}/cloud-init.yaml"))
   }
-
-  # Ensure NSG rules are created before instance
-  depends_on = [
-    oci_core_network_security_group_security_rule.ssh_22,
-    oci_core_network_security_group_security_rule.ssh_2200,
-    oci_core_network_security_group_security_rule.egress_all
-  ]
 }
 
 # Outputs
@@ -189,15 +182,3 @@ resource "oci_core_instance" "vm" {
 output "public_ip" {
   value = oci_core_instance.vm.public_ip
 }
-
-output "instance_ocid" {
-  value       = oci_core_instance.vm.id
-  description = "Instance OCID for OCI CLI operations"
-}
-
-output "nsg_ocid" {
-  value       = oci_core_network_security_group.nsg.id
-  description = "NSG OCID for OCI CLI operations"
-}
-
-# Note: To get VNIC OCID, use: oci compute instance list-vnics --instance-id $(terraform output -raw instance_ocid) --query 'data[0].id' --raw-output

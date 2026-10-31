@@ -1,44 +1,97 @@
-import type { ScrollViewRef } from 'ink-scroll-view'
-import { Box, useApp, useInput, useStdout } from 'ink'
-import { ScrollView } from 'ink-scroll-view'
+import type { Section, SlideState } from './lib/slideNavigation'
+import { Box, Text, useApp, useInput, useStdout } from 'ink'
 import * as React from 'react'
-import { useEffect, useRef, useState } from 'react'
-import { CONTACTME } from './components/CONTACTME'
-import { CountdownToSingularity } from './components/CountdownToSingularity'
-import { Header } from './components/Header'
-import { Hero } from './components/Hero'
-import { Projects } from './components/Projects'
-import { README } from './components/README'
+import { useEffect, useState } from 'react'
+import { Footer, Header, Main, Page, Sidebar } from './components/layout/index'
 import { ScreenTooSmall } from './components/ScreenTooSmall'
+import { ContactSlide1, ContactSlide2 } from './components/slides/ContactSlides'
+import { CountdownSlide1, CountdownSlide2 } from './components/slides/CountdownSlides'
+import { IntroSlide1 } from './components/slides/IntroSlides'
+import { OutroSlide1 } from './components/slides/OutroSlides'
+import { ProjectsSlide1, ProjectsSlide2, ProjectsSlide3, ProjectsSlide4 } from './components/slides/ProjectsSlides'
+import { ReadmeSlide1 } from './components/slides/ReadmeSlides'
+import { navigateNext, navigatePrevious, navigateToSection } from './lib/slideNavigation'
+import { theme } from './styles/theme'
 
 const MIN_WIDTH = 120
 const MIN_HEIGHT = 30
 
-// Approximate section positions (in lines)
-const SECTION_POSITIONS = {
-  hero: 0,
-  readme: 27, // Hero is ~12 lines
-  projects: 48, // Hero + README is ~30 lines
-  contactme: 171, // After Projects + CountdownToSingularity + ContactCta
-}
+// Define sections with their slides
+const sections: Section[] = [
+  {
+    id: 'intro',
+    name: 'Intro',
+    shortcut: 'i',
+    slides: [
+      { id: 'intro-1', component: IntroSlide1 },
+    ],
+  },
+  {
+    id: 'readme',
+    name: 'Readme',
+    shortcut: 'r',
+    slides: [
+      { id: 'readme-1', component: ReadmeSlide1 },
+    ],
+  },
+  {
+    id: 'projects',
+    name: 'Projects',
+    shortcut: 'p',
+    slides: [
+      { id: 'projects-1', component: ProjectsSlide1 },
+      { id: 'projects-2', component: ProjectsSlide2 },
+      { id: 'projects-3', component: ProjectsSlide3 },
+      { id: 'projects-4', component: ProjectsSlide4 },
+    ],
+  },
+  {
+    id: 'countdown',
+    name: 'Countdown',
+    shortcut: 'c',
+    slides: [
+      { id: 'countdown-1', component: CountdownSlide1 },
+      { id: 'countdown-2', component: CountdownSlide2 },
+    ],
+  },
+  {
+    id: 'contact',
+    name: 'Contact',
+    shortcut: 't',
+    slides: [
+      { id: 'contact-1', component: ContactSlide1 },
+      { id: 'contact-2', component: ContactSlide2 },
+    ],
+  },
+  {
+    id: 'outro',
+    name: 'Outro',
+    shortcut: 'o',
+    slides: [
+      { id: 'outro-1', component: OutroSlide1 },
+    ],
+  },
+]
 
 const App: React.FC = () => {
-  const scrollRef = useRef<ScrollViewRef>(null)
   const { stdout } = useStdout()
   const { exit } = useApp()
   const [dimensions, setDimensions] = useState({
     width: stdout?.columns || 0,
     height: stdout?.rows || 0,
   })
+  const [slideState, setSlideState] = useState<SlideState>({
+    currentSectionIndex: 0,
+    currentStepIndex: 0,
+  })
 
-  // 1. Handle Terminal Resizing due to manual window change
+  // Handle Terminal Resizing
   useEffect(() => {
     const handleResize = () => {
       setDimensions({
         width: stdout?.columns || 0,
         height: stdout?.rows || 0,
       })
-      scrollRef.current?.remeasure()
     }
     stdout?.on('resize', handleResize)
     return () => {
@@ -46,46 +99,25 @@ const App: React.FC = () => {
     }
   }, [stdout])
 
-  // 2. Handle Keyboard Input
+  // Handle Navigation: Up/Down arrows
   useInput((_input, key) => {
     if (key.upArrow) {
-      scrollRef.current?.scrollBy(-1) // Scroll up 1 line
+      setSlideState(prev => navigatePrevious(sections, prev))
     }
     if (key.downArrow) {
-      scrollRef.current?.scrollBy(1) // Scroll down 1 line
-    }
-    if (key.pageUp) {
-      // Scroll up by viewport height
-      const height = scrollRef.current?.getViewportHeight() || 1
-      scrollRef.current?.scrollBy(-height)
-    }
-    if (key.pageDown) {
-      const height = scrollRef.current?.getViewportHeight() || 1
-      scrollRef.current?.scrollBy(height)
+      setSlideState(prev => navigateNext(sections, prev))
     }
   })
 
-  // 3. Handle Navigation Keys
+  // Handle Section Navigation Keys
   useInput((input) => {
-    if (input === 'h' || input === 'H') {
-      // Scroll to Hero (top)
-      scrollRef.current?.scrollTo(SECTION_POSITIONS.hero)
-    }
-    if (input === 'r' || input === 'R') {
-      // Scroll to README
-      scrollRef.current?.scrollTo(SECTION_POSITIONS.readme)
-    }
-    if (input === 'p' || input === 'P') {
-      // Scroll to Projects
-      scrollRef.current?.scrollTo(SECTION_POSITIONS.projects)
-    }
-    if (input === 'c' || input === 'C') {
-      // Scroll to CONTACTME
-      scrollRef.current?.scrollTo(SECTION_POSITIONS.contactme)
+    const newState = navigateToSection(sections, input)
+    if (newState) {
+      setSlideState(newState)
     }
   })
 
-  // 4. Handle Escape or 'q' to quit
+  // Handle Escape or 'q' to quit
   useInput((input, key) => {
     if (
       key.escape
@@ -110,28 +142,47 @@ const App: React.FC = () => {
     )
   }
 
+  // Get current slide component
+  const currentSection = sections[slideState.currentSectionIndex]
+  const currentSlide = currentSection.slides[slideState.currentStepIndex]
+  const CurrentSlideComponent = currentSlide.component
+
   return (
-    <Box
-      width="100%"
-      height="100%"
-      position="relative"
-      // backgroundColor={theme.color.background}
-    >
-      <Box flexDirection="column" paddingX={3} paddingTop={6}>
-        <ScrollView ref={scrollRef}>
-          <Hero />
-          <README />
-          <Projects />
-          <CountdownToSingularity />
-          {/* <ContactCta /> */}
-          <CONTACTME />
-        </ScrollView>
+    <Page>
+      <Header>
+        <Text bold color={theme.color.primary}>Luis Emidio</Text>
+      </Header>
+
+      <Box flexDirection="row" flexGrow={1} height="100%">
+        <Sidebar>
+          <Box>
+            <Text>
+              [R] README
+            </Text>
+          </Box>
+          <Box>
+            <Text>[P] Projects</Text>
+          </Box>
+          <Box>
+            <Text>[C] Countdown</Text>
+          </Box>
+          <Box>
+            <Text>[T] Contact</Text>
+          </Box>
+          <Box>
+            <Text>[O] Outro</Text>
+          </Box>
+        </Sidebar>
+
+        <Main>
+          <CurrentSlideComponent step={slideState.currentStepIndex} />
+        </Main>
       </Box>
 
-      <Box position="absolute" paddingX={3} width="100%">
-        <Header />
-      </Box>
-    </Box>
+      <Footer>
+        <Text>Footer</Text>
+      </Footer>
+    </Page>
   )
 }
 
